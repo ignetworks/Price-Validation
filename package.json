@@ -1,0 +1,22 @@
+{
+  "name": "voc-alert",
+  "version": "3.0.0",
+  "description": "CLI tool to poll NetSuite for vendor bills and flag VOC line MRC price variances",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "poll": "node index.js poll",
+    "query": "node index.js query --today"
+  },
+  "keywords": ["netsuite", "voc", "vocline", "mrc", "price-validation"],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "axios": "^1.7.0",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.0",
+    "oauth-1.0a": "^2.2.6",
+    "p-limit": "^3.1.0"
+  }
+}
