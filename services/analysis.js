@@ -2,6 +2,9 @@
 
 const { getVocLines, getPriorMrcForService } = require('./netsuite');
 
+// Skip ICMS lines — Brazilian tax, not a real price signal (per Andrea)
+const ICMS_PATTERN = /\bicms\b/i;
+
 /**
  * Classify a variance percentage.
  * @param {number|null} variancePct - null means no prior rate found
@@ -35,6 +38,9 @@ async function analyzeBills(bills) {
     const lines = await getVocLines(billId);
 
     for (const line of lines) {
+      const haystack = `${line.itemName || ''} ${line.description || ''}`;
+      if (ICMS_PATTERN.test(haystack)) continue;
+
       const currentRate = line.rate;
       const prior = await getPriorMrcForService(line.itemId, billId, bill.tranDate);
 
