@@ -30,6 +30,7 @@ program
   .option('--today', 'Shorthand for today\'s date')
   .option('-a, --all', 'Show all results including matches')
   .option('-e, --export', 'Export results to JSON file')
+  .option('-r, --report', 'Export results to PDF report')
   .action((opts) => {
     const query = require('./commands/query');
     query(opts);

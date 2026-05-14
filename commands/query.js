@@ -6,6 +6,7 @@ const chalk = require('chalk');
 const { getVocsByDate, isDemoMode, closePool } = require('../services/netsuite');
 const { analyzeBills } = require('../services/analysis');
 const { printSummary, printAlertsTable } = require('../utils/format');
+const { generatePdfReport } = require('../utils/report');
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -81,6 +82,12 @@ module.exports = async function query(opts) {
       const filepath = path.join(process.cwd(), filename);
       fs.writeFileSync(filepath, JSON.stringify(allResults, null, 2), 'utf-8');
       console.log(chalk.green(`  Exported to ${filename}\n`));
+    }
+
+    if (opts.report && allResults.length > 0) {
+      console.log(chalk.dim('  Generating PDF report...'));
+      const filename = await generatePdfReport(allResults, dates);
+      console.log(chalk.green(`  Report saved to ${filename}\n`));
     }
   } catch (err) {
     process.stderr.write(chalk.red(`  Error: ${err.message}\n`));
