@@ -111,12 +111,13 @@ async function getVocsByDateLive(date) {
 
 async function getVocLinesLive(billId) {
   const rows = await nsSuiteQL(
-    `SELECT tl.item, i.displayname AS item_name, tl.rate, tl.quantity, tl.amount, tl.memo ` +
+    `SELECT tl.item, i.itemid AS item_code, i.displayname AS item_name, tl.rate, tl.quantity, tl.amount, tl.memo ` +
     `FROM transactionLine tl LEFT JOIN item i ON i.id = tl.item ` +
     `WHERE tl.transaction = ${billId} AND tl.mainline = 'F' AND tl.taxline = 'F' AND tl.item IS NOT NULL`
   );
   return rows.map(r => ({
     itemId: r.item ? String(r.item) : null,
+    itemCode: r.item_code || null,
     itemName: r.item_name || r.memo || `Item #${r.item}`,
     description: r.memo || '',
     rate: parseFloat(r.rate) || 0,
@@ -130,23 +131,46 @@ async function getPriorMrcForServiceLive(itemId, currentBillId, currentBillDate)
     ? (String(currentBillDate).includes('/') ? String(currentBillDate).slice(0, 10) : toNsDateFull(String(currentBillDate).slice(0, 10)))
     : null;
   const dateFilter = nsDate ? `AND t.trandate < TO_DATE('${nsDate}', 'MM/DD/YYYY') ` : '';
-  const rows = await nsSuiteQL(
-    `SELECT t.id, t.trandate, tl.rate, e.entityid AS vendor_name ` +
+  const billRows = await nsSuiteQL(
+    `SELECT t.id, t.trandate, e.entityid AS vendor_name ` +
     `FROM transaction t ` +
     `JOIN transactionLine tl ON tl.transaction = t.id ` +
     `LEFT JOIN entity e ON e.id = t.entity ` +
     `WHERE t.type = 'VendBill' AND tl.item = ${itemId} AND t.id != ${currentBillId} ` +
     `AND tl.mainline = 'F' AND tl.taxline = 'F' ` +
     dateFilter +
+    `GROUP BY t.id, t.trandate, e.entityid ` +
     `ORDER BY t.trandate DESC`
   );
-  if (!rows || rows.length === 0) return null;
-  const r = rows[0];
+  if (!billRows || billRows.length === 0) return null;
+  const priorBill = billRows[0];
+
+  // Sum all bills containing this item in the same calendar month as the most
+  // recent prior bill, so prior-side totals match the current-side aggregation.
+  const priorDateStr = String(priorBill.trandate).slice(0, 10);
+  const priorDateObj = new Date(priorDateStr);
+  const year = priorDateObj.getUTCFullYear();
+  const month = priorDateObj.getUTCMonth();
+  const monthStart = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const monthEnd = new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+  const nsMonthStart = toNsDateFull(monthStart);
+  const nsMonthEnd = toNsDateFull(monthEnd);
+
+  const sumRows = await nsSuiteQL(
+    `SELECT SUM(tl.amount) AS total_amount ` +
+    `FROM transactionLine tl ` +
+    `JOIN transaction t ON t.id = tl.transaction ` +
+    `WHERE t.type = 'VendBill' AND tl.item = ${itemId} ` +
+    `AND tl.mainline = 'F' AND tl.taxline = 'F' ` +
+    `AND t.trandate BETWEEN TO_DATE('${nsMonthStart}', 'MM/DD/YYYY') AND TO_DATE('${nsMonthEnd}', 'MM/DD/YYYY')`
+  );
+  const totalAmount = sumRows && sumRows[0] ? parseFloat(sumRows[0].total_amount) || 0 : 0;
+
   return {
-    mrc: parseFloat(r.rate) || 0,
-    vocDate: r.trandate,
-    vendorName: r.vendor_name || 'Unknown',
-    vocId: String(r.id),
+    mrc: totalAmount,
+    vocDate: priorBill.trandate,
+    vendorName: priorBill.vendor_name || 'Unknown',
+    vocId: String(priorBill.id),
   };
 }
 
@@ -197,6 +221,7 @@ function generateDemoVocLines(vocId) {
     _demoCurrentMrc.set(itemId, mrc);
     lines.push({
       itemId,
+      itemCode: `V${itemId}`,
       itemName: `V${itemId} - ${svc.toUpperCase()} for ${code} | MRC`,
       description: `${svc.toUpperCase()} for ${code}`,
       rate: mrc,

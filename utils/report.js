@@ -17,8 +17,8 @@ const COLS = [
   { label: 'Date',      width: 58  },
   { label: 'Vendor',    width: 130 },
   { label: 'VOC Item',  width: 165 },
-  { label: 'Curr MRC',  width: 72  },
-  { label: 'Prior MRC', width: 72  },
+  { label: 'Curr Total',  width: 72  },
+  { label: 'Prior Total', width: 72  },
   { label: 'Variance',  width: 68  },
 ];
 
